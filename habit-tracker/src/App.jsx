@@ -124,9 +124,9 @@ export default function App() {
   // Data states
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [activeCells, setActiveCells] = useState({});
-  const [habits, setHabits] = useState(DEFAULT_HABITS);
+  const [habits, setHabits] = useState([]);
   const [newHabit, setNewHabit] = useState("");
-  const [weeklyHabits, setWeeklyHabits] = useState(makeDefaultWeeklyHabits());
+  const [weeklyHabits, setWeeklyHabits] = useState({});
   const [newWeeklyTask, setNewWeeklyTask] = useState(Array(7).fill(""));
   const [dataLoading, setDataLoading] = useState(false);
 
@@ -155,6 +155,12 @@ export default function App() {
       // Habits
       if (habitsRes.data && habitsRes.data.length > 0) {
         setHabits(habitsRes.data.map(r => ({ id: r.habit_id, name: r.name })));
+      }else {
+        setHabits(DEFAULT_HABITS);
+        // Save defaults to Supabase for this new user
+        await Promise.all(DEFAULT_HABITS.map(h =>
+          supabase.from("habits").upsert({ user_id: userId, habit_id: h.id, name: h.name })
+        ));
       }
 
       // Active cells
@@ -175,6 +181,20 @@ export default function App() {
         });
         Object.keys(byDay).forEach(d => { wh[d] = byDay[d]; });
         setWeeklyHabits(wh);
+      }else {
+        const defaults = makeDefaultWeeklyHabits();
+        setWeeklyHabits(defaults);
+        // Save defaults to Supabase for this new user
+        await Promise.all(
+          Object.entries(defaults).flatMap(([dayIdx, tasks]) =>
+            tasks.map(t =>
+              supabase.from("weekly_habits").upsert({
+                user_id: userId, day_index: parseInt(dayIdx),
+                task_id: t.id, name: t.name, done: t.done,
+              })
+            )
+          )
+        );
       }
     } finally {
       setDataLoading(false);
