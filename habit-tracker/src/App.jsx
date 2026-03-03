@@ -1,5 +1,6 @@
 import "./App.css";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { supabase } from "./supabaseClient";
 
 const YEAR = 2026;
 const CELL_H = 26;
@@ -11,38 +12,20 @@ const months = [
   "July","August","September","October","November","December"
 ];
 
-// 7 days of week
 const DAYS_OF_WEEK = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 
-// Pastel colours per day (Mon–Sun), matching the reference image palette
 const DAY_COLORS = [
-  "#BBDEFB", // Monday   – blue
-  "#FFE0B2", // Tuesday  – orange/peach
-  "#FFF9C4", // Wednesday– yellow
-  "#C8E6C9", // Thursday – green
-  "#FFCCBC", // Friday   – salmon
-  "#B2EBF2", // Saturday – cyan
-  "#E1BEE7", // Sunday   – purple
+  "#BBDEFB","#FFE0B2","#FFF9C4","#C8E6C9","#FFCCBC","#B2EBF2","#E1BEE7",
 ];
-
-// Darker tones for the "done" bar (slightly more saturated)
 const DAY_DONE_COLORS = [
-  "#90CAF9",
-  "#FFB74D",
-  "#FFF176",
-  "#81C784",
-  "#FF8A65",
-  "#4DD0E1",
-  "#CE93D8",
+  "#90CAF9","#FFB74D","#FFF176","#81C784","#FF8A65","#4DD0E1","#CE93D8",
 ];
-
 const weekBgColors = [
-  "#E3F2FD", "#FFF9E6", "#FCE4EC", "#E8F5E9", "#F3E5F5", "#E0F7FA",
+  "#E3F2FD","#FFF9E6","#FCE4EC","#E8F5E9","#F3E5F5","#E0F7FA",
 ];
 const barColors = [
-  "#90CAF9", "#FFD54F", "#EF9A9A", "#A5D6A7", "#CE93D8", "#4DD0E1",
+  "#90CAF9","#FFD54F","#EF9A9A","#A5D6A7","#CE93D8","#4DD0E1",
 ];
-
 const DAY_LABELS = ["S","M","T","W","T","F","S"];
 
 function getDaysInMonth(m) { return new Date(YEAR, m + 1, 0).getDate(); }
@@ -66,69 +49,216 @@ function buildWeeks(month) {
   return { weeks, colDow };
 }
 
-// Default weekly tasks — same 5 for every day to start
+const DEFAULT_HABITS = [
+  { id: "1", name: "Wake up early" },
+  { id: "2", name: "Drink water" },
+  { id: "3", name: "Plan the day" },
+  { id: "4", name: "Exercise" },
+  { id: "5", name: "Meditate" },
+  { id: "6", name: "Read a book" },
+  { id: "7", name: "Write gratitude" },
+];
+
 const DEFAULT_WEEKLY_TASKS = [
-  "Plan weekly goals",
-  "Exercise 3-5 times",
-  "Clean the house",
-  "Do laundry",
-  "Grocery shopping",
+  "Plan weekly goals","Exercise 3-5 times","Clean the house","Do laundry","Grocery shopping",
 ];
 
 function makeDefaultWeeklyHabits() {
-  // For each day index 0-6, an array of { id, name, done }
   const result = {};
   for (let d = 0; d < 7; d++) {
     result[d] = DEFAULT_WEEKLY_TASKS.map((name, i) => ({
-      id: `d${d}-${i}`,
-      name,
-      done: false,
+      id: `d${d}-${i}`, name, done: false,
     }));
   }
   return result;
 }
 
+// ─── Login Screen ───────────────────────────────────────────────────────────
+function LoginScreen() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    setError("");
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.origin },
+    });
+    if (error) { setError(error.message); setLoading(false); }
+  };
+
+  return (
+    <div className="login-page">
+      <div className="login-card">
+        <div className="login-icon">📋</div>
+        <h1 className="login-title">HABIT TRACKER</h1>
+        <p className="login-sub">Track your daily & weekly habits.<br />Sign in to save your progress across devices.</p>
+        {error && <div className="login-error">{error}</div>}
+        <button className="google-btn" onClick={handleGoogleLogin} disabled={loading}>
+          {loading ? (
+            <span className="login-spinner" />
+          ) : (
+            <>
+              <svg width="18" height="18" viewBox="0 0 48 48">
+                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.36-8.16 2.36-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+              </svg>
+              Continue with Google
+            </>
+          )}
+        </button>
+        <p className="login-note">Your data is private and synced to your account.</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main App ────────────────────────────────────────────────────────────────
 export default function App() {
-  const [selectedMonth, setSelectedMonth] = useState(0);
+  const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
-  // Daily habit tracker state
-  const [activeCells, setActiveCells] = useState(() => {
-    try { const s = localStorage.getItem("hbt-cells"); return s ? JSON.parse(s) : {}; }
-    catch { return {}; }
-  });
-  const [habits, setHabits] = useState(() => {
-    try {
-      const s = localStorage.getItem("hbt-habits");
-      return s ? JSON.parse(s) : [
-        { id: "1", name: "Wake up early" },
-        { id: "2", name: "Drink water" },
-        { id: "3", name: "Plan the day" },
-        { id: "4", name: "Exercise" },
-        { id: "5", name: "Meditate" },
-        { id: "6", name: "Read a book" },
-        { id: "7", name: "Write gratitude" },
-      ];
-    } catch { return []; }
-  });
+  // Data states
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [activeCells, setActiveCells] = useState({});
+  const [habits, setHabits] = useState(DEFAULT_HABITS);
   const [newHabit, setNewHabit] = useState("");
-
-  // Weekly habits state — keyed by day index 0-6
-  const [weeklyHabits, setWeeklyHabits] = useState(() => {
-    try {
-      const s = localStorage.getItem("hbt-weekly");
-      return s ? JSON.parse(s) : makeDefaultWeeklyHabits();
-    } catch { return makeDefaultWeeklyHabits(); }
-  });
-  // New task input per day
+  const [weeklyHabits, setWeeklyHabits] = useState(makeDefaultWeeklyHabits());
   const [newWeeklyTask, setNewWeeklyTask] = useState(Array(7).fill(""));
+  const [dataLoading, setDataLoading] = useState(false);
 
-  useEffect(() => { localStorage.setItem("hbt-cells", JSON.stringify(activeCells)); }, [activeCells]);
-  useEffect(() => { localStorage.setItem("hbt-habits", JSON.stringify(habits)); }, [habits]);
-  useEffect(() => { localStorage.setItem("hbt-weekly", JSON.stringify(weeklyHabits)); }, [weeklyHabits]);
+  // ── Auth listener ──
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setAuthLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
+  // ── Load data when session changes ──
+  const loadData = useCallback(async (userId) => {
+    setDataLoading(true);
+    try {
+      const [habitsRes, cellsRes, weeklyRes] = await Promise.all([
+        supabase.from("habits").select("*").eq("user_id", userId),
+        supabase.from("habit_cells").select("*").eq("user_id", userId),
+        supabase.from("weekly_habits").select("*").eq("user_id", userId),
+      ]);
+
+      // Habits
+      if (habitsRes.data && habitsRes.data.length > 0) {
+        setHabits(habitsRes.data.map(r => ({ id: r.habit_id, name: r.name })));
+      }
+
+      // Active cells
+      if (cellsRes.data) {
+        const cells = {};
+        cellsRes.data.forEach(r => { cells[r.cell_key] = r.active; });
+        setActiveCells(cells);
+      }
+
+      // Weekly habits
+      if (weeklyRes.data && weeklyRes.data.length > 0) {
+        const wh = makeDefaultWeeklyHabits();
+        // Group by day_index
+        const byDay = {};
+        weeklyRes.data.forEach(r => {
+          if (!byDay[r.day_index]) byDay[r.day_index] = [];
+          byDay[r.day_index].push({ id: r.task_id, name: r.name, done: r.done });
+        });
+        Object.keys(byDay).forEach(d => { wh[d] = byDay[d]; });
+        setWeeklyHabits(wh);
+      }
+    } finally {
+      setDataLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (session?.user?.id) loadData(session.user.id);
+  }, [session, loadData]);
+
+  const userId = session?.user?.id;
+
+  // ── Habits CRUD ──
+  const addHabit = async () => {
+    if (!newHabit.trim() || !userId) return;
+    const habit = { id: crypto.randomUUID(), name: newHabit.trim() };
+    setHabits(prev => [...prev, habit]);
+    setNewHabit("");
+    await supabase.from("habits").upsert({
+      user_id: userId, habit_id: habit.id, name: habit.name,
+    });
+  };
+
+  const deleteHabit = async (hid) => {
+    setHabits(prev => prev.filter(h => h.id !== hid));
+    if (userId) {
+      await supabase.from("habits").delete().eq("user_id", userId).eq("habit_id", hid);
+    }
+  };
+
+  // ── Cell toggle ──
   const ck = (day, hid) => `${YEAR}-${selectedMonth}-${day}-${hid}`;
-  const toggle = (key) => setActiveCells(prev => ({ ...prev, [key]: !prev[key] }));
 
+  const toggle = async (key) => {
+    const newVal = !activeCells[key];
+    setActiveCells(prev => ({ ...prev, [key]: newVal }));
+    if (userId) {
+      await supabase.from("habit_cells").upsert(
+        { user_id: userId, cell_key: key, active: newVal },
+        { onConflict: "user_id,cell_key" }
+      );
+    }
+  };
+
+  // ── Weekly habits CRUD ──
+  const toggleWeeklyDone = async (dayIdx, taskId) => {
+    const task = weeklyHabits[dayIdx]?.find(t => t.id === taskId);
+    if (!task) return;
+    const newDone = !task.done;
+    setWeeklyHabits(prev => ({
+      ...prev,
+      [dayIdx]: prev[dayIdx].map(t => t.id === taskId ? { ...t, done: newDone } : t),
+    }));
+    if (userId) {
+      await supabase.from("weekly_habits").upsert(
+        { user_id: userId, day_index: dayIdx, task_id: taskId, name: task.name, done: newDone },
+        { onConflict: "user_id,day_index,task_id" }
+      );
+    }
+  };
+
+  const deleteWeeklyTask = async (dayIdx, taskId) => {
+    setWeeklyHabits(prev => ({
+      ...prev,
+      [dayIdx]: prev[dayIdx].filter(t => t.id !== taskId),
+    }));
+    if (userId) {
+      await supabase.from("weekly_habits").delete()
+        .eq("user_id", userId).eq("day_index", dayIdx).eq("task_id", taskId);
+    }
+  };
+
+  const addWeeklyTask = async (dayIdx) => {
+    const name = newWeeklyTask[dayIdx]?.trim();
+    if (!name || !userId) return;
+    const task = { id: crypto.randomUUID(), name, done: false };
+    setWeeklyHabits(prev => ({ ...prev, [dayIdx]: [...prev[dayIdx], task] }));
+    setNewWeeklyTask(prev => { const n = [...prev]; n[dayIdx] = ""; return n; });
+    await supabase.from("weekly_habits").upsert({
+      user_id: userId, day_index: dayIdx, task_id: task.id, name, done: false,
+    });
+  };
+
+  // ── Computed stats ──
   const dim = getDaysInMonth(selectedMonth);
   const { weeks, colDow } = buildWeeks(selectedMonth);
 
@@ -154,44 +284,39 @@ export default function App() {
   const mPct = mTot ? (mComp / mTot * 100).toFixed(1) : "0.0";
   const circ = 2 * Math.PI * 45;
   const dashOff = circ - (parseFloat(mPct) / 100) * circ;
-
   const barMaxH = DONUT_SIZE;
   const CAL_TOP_H = 36 + CELL_H + CELL_H;
-
-  // Weekly habit helpers
-  const toggleWeeklyDone = (dayIdx, taskId) => {
-    setWeeklyHabits(prev => ({
-      ...prev,
-      [dayIdx]: prev[dayIdx].map(t => t.id === taskId ? { ...t, done: !t.done } : t),
-    }));
-  };
-
-  const deleteWeeklyTask = (dayIdx, taskId) => {
-    setWeeklyHabits(prev => ({
-      ...prev,
-      [dayIdx]: prev[dayIdx].filter(t => t.id !== taskId),
-    }));
-  };
-
-  const addWeeklyTask = (dayIdx) => {
-    const name = newWeeklyTask[dayIdx]?.trim();
-    if (!name) return;
-    setWeeklyHabits(prev => ({
-      ...prev,
-      [dayIdx]: [...prev[dayIdx], { id: crypto.randomUUID(), name, done: false }],
-    }));
-    setNewWeeklyTask(prev => { const n = [...prev]; n[dayIdx] = ""; return n; });
-  };
-
-  // Progress bar max height for weekly section
   const PROGRESS_BAR_MAX = 120;
+
+  // ── Auth gates ──
+  if (authLoading) {
+    return (
+      <div className="login-page">
+        <div className="login-card">
+          <div className="login-spinner" style={{ width: 32, height: 32, borderWidth: 3 }} />
+        </div>
+      </div>
+    );
+  }
+  if (!session) return <LoginScreen />;
 
   return (
     <div className="page">
 
+      {/* User bar */}
+      <div className="user-bar">
+        <div className="user-info">
+          {session.user.user_metadata?.avatar_url && (
+            <img src={session.user.user_metadata.avatar_url} alt="avatar" className="user-avatar" />
+          )}
+          <span className="user-name">{session.user.user_metadata?.full_name || session.user.email}</span>
+          {dataLoading && <span className="sync-badge">Syncing…</span>}
+        </div>
+        <button className="signout-btn" onClick={() => supabase.auth.signOut()}>Sign out</button>
+      </div>
+
       {/* ═══════════ TOP SECTION ═══════════ */}
       <section className="top-section">
-
         <div className="top-main-row">
           <div className="top-left">
             <div className="start-date-box">
@@ -246,7 +371,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Shared strip rows */}
         <div className="shared-strip-row" style={{ height: STRIP_H }}>
           <div className="left-strip ls-comp" style={{ height: STRIP_H }}>
             <span className="ls-dot dot-green" />
@@ -309,7 +433,7 @@ export default function App() {
         </div>
       </section>
 
-      {/* ═══════════ MIDDLE SECTION (Daily habit tracker) ═══════════ */}
+      {/* ═══════════ MIDDLE SECTION ═══════════ */}
       <section className="middle-section">
         <div className="tracker-body">
           <div className="habits-panel">
@@ -320,7 +444,7 @@ export default function App() {
               <div className="habit-row" key={habit.id} style={{ height: CELL_H }}>
                 <span className="habit-num">{idx + 1}</span>
                 <span className="habit-name">{habit.name}</span>
-                <button className="del-btn" onClick={() => setHabits(habits.filter(h => h.id !== habit.id))}>✕</button>
+                <button className="del-btn" onClick={() => deleteHabit(habit.id)}>✕</button>
               </div>
             ))}
             <div className="add-habit-row">
@@ -328,12 +452,7 @@ export default function App() {
                 placeholder="+ Add new habit..."
                 value={newHabit}
                 onChange={e => setNewHabit(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === "Enter" && newHabit.trim()) {
-                    setHabits([...habits, { id: crypto.randomUUID(), name: newHabit.trim() }]);
-                    setNewHabit("");
-                  }
-                }}
+                onKeyDown={e => { if (e.key === "Enter") addHabit(); }}
               />
             </div>
           </div>
@@ -383,13 +502,9 @@ export default function App() {
       {/* ═══════════ WEEKLY HABITS SECTION ═══════════ */}
       <section className="bottom-section">
         <div className="bottom-body">
-
-          {/* Left label */}
           <div className="bottom-label-col">
             <span className="bottom-label-text">Weekly Habits / Tasks / Routines</span>
           </div>
-
-          {/* 7 day columns */}
           <div className="weekly-days-area">
             {DAYS_OF_WEEK.map((dayName, di) => {
               const tasks = weeklyHabits[di] || [];
@@ -397,34 +512,17 @@ export default function App() {
               const totalCount = tasks.length;
               return (
                 <div key={di} className="weekly-day-col" style={{ background: DAY_COLORS[di] }}>
-                  {/* Day header */}
-                  <div className="wday-header" style={{ background: DAY_DONE_COLORS[di] }}>
-                    {dayName}
-                  </div>
-
-                  {/* Task list */}
+                  <div className="wday-header" style={{ background: DAY_DONE_COLORS[di] }}>{dayName}</div>
                   <div className="wday-tasks">
                     {tasks.map(task => (
                       <div key={task.id} className="wday-task-row">
-                        <button
-                          className="wday-dot-btn"
-                          onClick={() => toggleWeeklyDone(di, task.id)}
-                          title="Toggle done"
-                        >
+                        <button className="wday-dot-btn" onClick={() => toggleWeeklyDone(di, task.id)}>
                           <span className={`wday-dot${task.done ? " wday-dot-done" : ""}`} />
                         </button>
-                        <span className={`wday-task-name${task.done ? " wday-done-text" : ""}`}>
-                          {task.name}
-                        </span>
-                        <button
-                          className="wday-del-btn"
-                          onClick={() => deleteWeeklyTask(di, task.id)}
-                          title="Delete task"
-                        >✕</button>
+                        <span className={`wday-task-name${task.done ? " wday-done-text" : ""}`}>{task.name}</span>
+                        <button className="wday-del-btn" onClick={() => deleteWeeklyTask(di, task.id)}>✕</button>
                       </div>
                     ))}
-
-                    {/* Add new task input */}
                     <div className="wday-add-row">
                       <input
                         className="wday-add-input"
@@ -435,11 +533,7 @@ export default function App() {
                       />
                     </div>
                   </div>
-
-                  {/* Score footer */}
-                  <div className="wday-score" style={{ background: DAY_DONE_COLORS[di] }}>
-                    {doneCount} / {totalCount}
-                  </div>
+                  <div className="wday-score" style={{ background: DAY_DONE_COLORS[di] }}>{doneCount} / {totalCount}</div>
                 </div>
               );
             })}
@@ -450,57 +544,33 @@ export default function App() {
       {/* ═══════════ WEEKLY PROGRESS BARS SECTION ═══════════ */}
       <section className="bottom-section">
         <div className="bottom-body">
-
-          {/* Left label */}
           <div className="bottom-label-col">
             <span className="bottom-label-text">Weekly Habits / Tasks / Routines Progress</span>
           </div>
-
-          {/* 7 day bar charts */}
           <div className="weekly-days-area">
             {DAYS_OF_WEEK.map((dayName, di) => {
               const tasks = weeklyHabits[di] || [];
               const total = tasks.length;
               const done = tasks.filter(t => t.done).length;
-              const totalH = total > 0 ? Math.round((total / Math.max(total, 1)) * PROGRESS_BAR_MAX) : 0;
               const doneH = total > 0 ? Math.round((done / total) * PROGRESS_BAR_MAX) : 0;
-
               return (
                 <div key={di} className="progress-day-col">
-                  {/* Twin bars */}
                   <div className="progress-bars-wrap" style={{ height: PROGRESS_BAR_MAX }}>
-                    {/* Total bar (always full height when tasks exist) */}
                     <div className="prog-bar-slot">
                       {total > 0 && (
-                        <div
-                          className="prog-bar prog-bar-total"
-                          style={{
-                            height: PROGRESS_BAR_MAX,
-                            background: DAY_COLORS[di],
-                            borderColor: DAY_DONE_COLORS[di],
-                          }}
-                        >
+                        <div className="prog-bar prog-bar-total" style={{ height: PROGRESS_BAR_MAX, background: DAY_COLORS[di], borderColor: DAY_DONE_COLORS[di] }}>
                           <span className="prog-bar-num">{total}</span>
                         </div>
                       )}
                     </div>
-                    {/* Done bar */}
                     <div className="prog-bar-slot">
                       {done > 0 && (
-                        <div
-                          className="prog-bar prog-bar-done"
-                          style={{
-                            height: doneH,
-                            background: DAY_DONE_COLORS[di],
-                          }}
-                        >
+                        <div className="prog-bar prog-bar-done" style={{ height: doneH, background: DAY_DONE_COLORS[di] }}>
                           <span className="prog-bar-num">{done}</span>
                         </div>
                       )}
                     </div>
                   </div>
-
-                  {/* Day label below bars */}
                   <div className="progress-day-label">{dayName}</div>
                 </div>
               );
